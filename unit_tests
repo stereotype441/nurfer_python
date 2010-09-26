@@ -1,0 +1,5 @@
+set -e
+python undefined_names.py
+python forward_analysis.py
+python dataflow_analysis.py
+python scope_analysis.py
