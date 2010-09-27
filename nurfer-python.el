@@ -1,8 +1,8 @@
-(defcustom pht-python-executable "python"
+(defcustom nurfer-python-executable "python"
   "Pathname to the python executable"
   :type '(string))
 
-(defcustom pht-undefined-names-script (concat (file-name-directory load-file-name) "undefined_names.py")
+(defcustom nurfer-undefined-names-script (concat (file-name-directory load-file-name) "undefined_names.py")
   "Pathname to the 'undefined_names.py' script"
   :type '(string))
 
@@ -39,11 +39,11 @@
 		(apply 'call-process-region
 		       (point-min)
 		       (point-max)
-		       pht-python-executable
+		       nurfer-python-executable
 		       nil
 		       temp-buffer
 		       nil
-		       pht-undefined-names-script
+		       nurfer-undefined-names-script
 		       "-s"
 		       options))))
 	(if (not (= process-result 0))
@@ -59,11 +59,11 @@
   "Run undefined_names.py to find names in the current buffer that are undefined."
   (interactive)
   (let ((spans (get-undefined-name-spans)))
-    (remove-overlays (point-min) (point-max) 'pht 'undefined-name)
+    (remove-overlays (point-min) (point-max) 'nurfer 'undefined-name)
     (while spans
       (let* ((item (pop spans))
 	     (overlay (make-overlay (1+ (car item)) (1+ (cadr item)))))
-	(overlay-put overlay 'pht 'undefined-name)
+	(overlay-put overlay 'nurfer 'undefined-name)
 	(overlay-put overlay 'face font-lock-warning-face)))))
 (defun find-undefined-names-if-python ()
   (if (string= mode-name "Python")
