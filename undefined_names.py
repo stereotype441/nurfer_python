@@ -3,7 +3,6 @@ import re
 import unittest
 import sys
 
-import push_back_iter
 import forward_analysis
 import scope_analysis
 
