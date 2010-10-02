@@ -1,0 +1,11 @@
+Things to do/support
+- Things that are never used
+- Messages
+- Documentation for how to change the color
+- Know what modules are available so it won't try to quick fix "import x"
+- python-extract-variable should not be written in elisp
+- python-extract-variable should look for other uses of the same expr and offer to refactor them too.
+- Is it possible to suggest a refactor?
+- When typing something undefined, if it exists in a libarary, offer to quick fix it by importing and qualifying thename, e.g. I type "stdin.read()" and the quickfix is "import sys...sys.stdin.read()".
+- Check out my crappy unit test in scope_analysis.py.  It doesn't test anything.
+- Learn about "setup.py develop"
