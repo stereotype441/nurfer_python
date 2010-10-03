@@ -16,6 +16,8 @@ EOL_REGEXP = re.compile('$', re.MULTILINE)
 NESTING_OPERATOR_REGEXP = re.compile(r'(?P<open>[[({])|(?P<close>[])}])')
 STATEMENT_CONTINUATION_REGEXP = re.compile(r'\s*(elif|else|except|finally)\b')
 BLOCK_INTRO_REGEXP = re.compile(r'\s*(def|class)\b')
+ANONYMOUS_IDENTIFIER_PATTERN = r'[a-zA-Z_]\w*'
+TARGET_PATTERN = r'%s(\s*,\s*%s)*' % (ANONYMOUS_IDENTIFIER_PATTERN, ANONYMOUS_IDENTIFIER_PATTERN)
 
 
 class Token(Span):

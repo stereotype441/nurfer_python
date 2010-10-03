@@ -1,5 +1,6 @@
 from span import Span
 import tokenization
+import re
 
 
 KEYWORDS = ['and', 'as', 'assert', 'break', 'class', 'continue',
@@ -7,6 +8,10 @@ KEYWORDS = ['and', 'as', 'assert', 'break', 'class', 'continue',
             'for', 'from', 'global', 'if', 'import', 'in', 'is',
             'lambda', 'not', 'or', 'pass', 'print', 'raise', 'return',
             'try', 'while', 'with', 'yield']
+IMPORT_PATTERN = (r'(from\s+%s(\.%s)*\s+)?import\s+(?P<import>%s)'
+                  % (tokenization.ANONYMOUS_IDENTIFIER_PATTERN, tokenization.ANONYMOUS_IDENTIFIER_PATTERN, tokenization.TARGET_PATTERN))
+BOUND_NAME_REGEXP = re.compile(r'\s*(?:(?P<assignment>%s)\s*=|for\s+(?P<for>%s)|%s|(class|def)\s+(?P<class_or_def>%s))' %
+                               (tokenization.TARGET_PATTERN, tokenization.TARGET_PATTERN, IMPORT_PATTERN, tokenization.ANONYMOUS_IDENTIFIER_PATTERN))
 
 
 class LogicalLine(Span):
@@ -48,3 +53,9 @@ class LogicalLine(Span):
     @property
     def tokens(self):
         return self._tokens
+
+    def find_bound_names(self):
+        match = BOUND_NAME_REGEXP.match(self.full_text, self.start, self.end)
+        if match is not None:
+            for target in match.group(match.lastgroup).split(','):
+                yield target.strip()

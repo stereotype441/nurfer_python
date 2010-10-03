@@ -2,22 +2,10 @@ import re
 import unittest
 
 import forward_analysis
+import tokenization
 
 
-ANONYMOUS_IDENTIFIER_PATTERN = r'[a-zA-Z_]\w*'
-TARGET_PATTERN = r'%s(\s*,\s*%s)*' % (ANONYMOUS_IDENTIFIER_PATTERN, ANONYMOUS_IDENTIFIER_PATTERN)
-DEF_REGEXP = re.compile(r'\s*def\s+%s\s*\(\s*(?P<args>%s)' % (ANONYMOUS_IDENTIFIER_PATTERN, TARGET_PATTERN))
-IMPORT_PATTERN = (r'(from\s+%s(\.%s)*\s+)?import\s+(?P<import>%s)'
-                  % (ANONYMOUS_IDENTIFIER_PATTERN, ANONYMOUS_IDENTIFIER_PATTERN, TARGET_PATTERN))
-BOUND_NAME_REGEXP = re.compile(r'\s*(?:(?P<assignment>%s)\s*=|for\s+(?P<for>%s)|%s|(class|def)\s+(?P<class_or_def>%s))' %
-                               (TARGET_PATTERN, TARGET_PATTERN, IMPORT_PATTERN, ANONYMOUS_IDENTIFIER_PATTERN))
-
-
-def find_bound_names_on_line(line):
-    match = BOUND_NAME_REGEXP.match(line.full_text, line.start, line.end)
-    if match is not None:
-        for target in match.group(match.lastgroup).split(','):
-            yield target.strip()
+DEF_REGEXP = re.compile(r'\s*def\s+%s\s*\(\s*(?P<args>%s)' % (tokenization.ANONYMOUS_IDENTIFIER_PATTERN, tokenization.TARGET_PATTERN))
 
 
 def find_bound_names(block):
@@ -29,10 +17,10 @@ def find_bound_names(block):
                 bound_names.add(target.strip())
     for elem in block.suite:
         if isinstance(elem, forward_analysis.LogicalLine):
-            bound_names |= set(find_bound_names_on_line(elem))
+            bound_names |= set(elem.find_bound_names())
         else:
             assert isinstance(elem, forward_analysis.Block)
-            bound_names |= set(find_bound_names_on_line(elem.intro))
+            bound_names |= set(elem.intro.find_bound_names())
     return bound_names
 
 
