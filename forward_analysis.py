@@ -1,83 +1,9 @@
 import re
 import unittest
 from block import Block
-
-
-SHORT_STRING_CONTENTS_REGEXP = re.compile('\\\\.|(?P<quote>\'|")|(?P<eol>$)', re.DOTALL | re.MULTILINE)
-LONG_STRING_CONTENTS_REGEXP = re.compile('\\\\.|(?P<quote>\'{3}|"{3})', re.DOTALL)
-SIMPLE_STRING_START_PATTERN = '(?P<quote>\'(\'\')?|"("")?)' # Ignores leading 'u'/'r'
-COMMENT_START_PATTERN = r'(?P<comment>#)'
-STRING_OR_COMMENT_START_REGEXP = re.compile('%s|%s' % (SIMPLE_STRING_START_PATTERN, COMMENT_START_PATTERN))
-EOL_REGEXP = re.compile('$', re.MULTILINE)
-NESTING_OPERATOR_REGEXP = re.compile(r'(?P<open>[[({])|(?P<close>[])}])')
-STATEMENT_CONTINUATION_REGEXP = re.compile(r'\s*(elif|else|except|finally)\b')
-BLOCK_INTRO_REGEXP = re.compile(r'\s*(def|class)\b')
-ANONYMOUS_IDENTIFIER_PATTERN = r'[a-zA-Z_]\w*'
-IDENTIFIER_PATTERN = r'(?P<identifier>%s)' % ANONYMOUS_IDENTIFIER_PATTERN
-COMMENT_PATTERN = r'(?P<comment>#.*$)'
-SYMBOL_PATTERN = r'(?P<symbol>!=|%=|&=|\*\*|\*\*=|\*=|\+=|-=|//|//=|/=|<<|<<=|<=|<>|==|>=|>>|>>=|\^=|\|=|[!%&()*+,\-./:;<=>@[\]^`{|}~])'
-TOKEN_REGEXP = re.compile('%s|%s|%s|%s' % (SIMPLE_STRING_START_PATTERN, IDENTIFIER_PATTERN, COMMENT_PATTERN, SYMBOL_PATTERN), re.MULTILINE)
-KEYWORDS = ['and', 'as', 'assert', 'break', 'class', 'continue',
-            'def', 'del', 'elif', 'else', 'except', 'exec', 'finally',
-            'for', 'from', 'global', 'if', 'import', 'in', 'is',
-            'lambda', 'not', 'or', 'pass', 'print', 'raise', 'return',
-            'try', 'while', 'with', 'yield']
-
-
-class Span(object):
-    def __init__(self, full_text, start, end):
-        self._full_text = full_text
-        self._start = start
-        self._end = end
-
-    @property
-    def full_text(self):
-        return self._full_text
-
-    @property
-    def start(self):
-        return self._start
-
-    @property
-    def end(self):
-        return self._end
-
-    @property
-    def sub_text(self):
-        return self._full_text[self._start : self._end]
-
-    def cut(self, cut_pos):
-        span1 = self.__new__(type(self))
-        span1.__dict__.update(self.__dict__)
-        span1._end = cut_pos
-        span2 = self.__new__(type(self))
-        span2.__dict__.update(self.__dict__)
-        span2._start = cut_pos
-        return span1, span2
-
-    def __repr__(self):
-        other_properties = self.__dict__.copy()
-        del other_properties['_full_text']
-        del other_properties['_start']
-        del other_properties['_end']
-        return '<%s %r (%r-%r) %r>' % (type(self).__name__, self.sub_text, self.start, self.end, other_properties)
-
-
-def find_string_end(text, pos, quote_type):
-    if len(quote_type) == 1:
-        re = SHORT_STRING_CONTENTS_REGEXP
-    else:
-        re = LONG_STRING_CONTENTS_REGEXP
-    while pos <= len(text):
-        match = re.search(text, pos)
-        if match is None:
-            break
-        if match.lastgroup == 'quote' and match.group() == quote_type:
-            return match.end()
-        elif match.lastgroup == 'eol':
-            return match.start()
-        pos = match.end()
-    return len(text) # Unterminated string.
+from span import Span
+from logical_line import LogicalLine
+import tokenization
 
 
 class SyntacticTypeSpan(Span):
@@ -100,7 +26,7 @@ class SyntacticTypeSpan(Span):
 def analyze_strings_and_comments(text):
     pos = 0
     while pos < len(text):
-        match = STRING_OR_COMMENT_START_REGEXP.search(text, pos)
+        match = tokenization.STRING_OR_COMMENT_START_REGEXP.search(text, pos)
         if match is None:
             yield SyntacticTypeSpan(text, pos, len(text), 'normal')
             return
@@ -108,11 +34,11 @@ def analyze_strings_and_comments(text):
             yield SyntacticTypeSpan(text, pos, match.start(), 'normal')
             pos = match.start()
         if match.lastgroup == 'quote':
-            end = find_string_end(text, match.end(), match.group())
+            end = tokenization.find_string_end(text, match.end(), match.group())
             type = 'string'
         else:
             assert match.lastgroup == 'comment'
-            match = EOL_REGEXP.search(text, match.end())
+            match = tokenization.EOL_REGEXP.search(text, match.end())
             if match is None:
                 end = len(text)
             else:
@@ -160,7 +86,7 @@ def analyze_symbolic_nesting(text):
         else:
             pos = span.start
             while True:
-                match = NESTING_OPERATOR_REGEXP.search(text, pos, span.end)
+                match = tokenization.NESTING_OPERATOR_REGEXP.search(text, pos, span.end)
                 if match is None:
                     break
                 elif match.lastgroup == 'open':
@@ -216,69 +142,6 @@ class TestSymbolicNestingAnalysis(unittest.TestCase):
         for text, expected_spans in test_cases:
             spans = [span_text for span_text in self.collect_nested_spans(analyze_symbolic_nesting(text))]
         self.assertEqual(spans, expected_spans)
-
-
-class Token(Span):
-    """Stores the location of a token in a document, and its type and text.
-
-    Possible types are:
-      'IDENTIFIER'
-      'LITERAL' (e.g. string)
-      any keyword (lowercase)
-      any symbol
-    """
-
-    def __init__(self, full_text, token_type, start, end):
-        Span.__init__(self, full_text, start, end)
-        self._token_type = token_type
-
-    @property
-    def type(self):
-        return self._token_type
-
-    def __str__(self):
-        return self.sub_text
-
-
-class LogicalLine(Span):
-    """Span representing a single logical line in the document."""
-
-    def __init__(self, full_text, start, end, indentation):
-        Span.__init__(self, full_text, start, end)
-        self._indentation = indentation
-        self._tokens = list(self._tokenize())
-
-    def _tokenize(self):
-        pos = self.start
-        while pos <= self.end:
-            match = TOKEN_REGEXP.search(self.full_text, pos, self.end)
-            if match is None:
-                break
-            start, end = match.span()
-            if match.lastgroup == 'identifier':
-                if match.group() in KEYWORDS:
-                    type = match.group()
-                else:
-                    type = 'IDENTIFIER'
-            elif match.lastgroup == 'symbol':
-                type = match.group()
-            elif match.lastgroup == 'quote':
-                type = 'LITERAL'
-                quote_type = match.group('quote')
-                end = find_string_end(self.full_text, end, quote_type)
-            elif match.lastgroup == 'comment':
-                pos = end
-                continue
-            yield Token(self.full_text, type, start, end)
-            pos = end
-
-    @property
-    def indentation(self):
-        return self._indentation
-
-    @property
-    def tokens(self):
-        return self._tokens
 
 
 def analyze_lines(text):
@@ -464,7 +327,7 @@ def analyze_statements(text):
         return Compound(compound_intro, analyzed_suite)
 
     def is_statement_continuation(line):
-        return STATEMENT_CONTINUATION_REGEXP.match(text, line.start, line.end) is not None
+        return tokenization.STATEMENT_CONTINUATION_REGEXP.match(text, line.start, line.end) is not None
 
     def analyze_suite(lines):
         """Yields the statements that make up the suite"""
@@ -530,7 +393,7 @@ def _flatten_statements_to_blocks(statements):
     for statement in statements:
         for compound in statement.children:
             intro_logical_line = compound.intro
-            if BLOCK_INTRO_REGEXP.match(intro_logical_line.full_text, intro_logical_line.start, intro_logical_line.end) is not None:
+            if tokenization.BLOCK_INTRO_REGEXP.match(intro_logical_line.full_text, intro_logical_line.start, intro_logical_line.end) is not None:
                 yield Block(compound.intro, list(_flatten_statements_to_blocks(compound.suite)))
             else:
                 yield compound.intro

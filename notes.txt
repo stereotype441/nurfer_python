@@ -9,3 +9,4 @@ Things to do/support
 - When typing something undefined, if it exists in a libarary, offer to quick fix it by importing and qualifying thename, e.g. I type "stdin.read()" and the quickfix is "import sys...sys.stdin.read()".
 - Check out my crappy unit test in scope_analysis.py.  It doesn't test anything.
 - Learn about "setup.py develop"
+- OMG I'm renaming re in find_string_end.
