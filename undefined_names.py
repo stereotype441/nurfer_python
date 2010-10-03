@@ -118,7 +118,7 @@ def fixup_add_import(toplevel_statements, import_name):
 
 def find_unbound_tokens(toplevel_statements, block, names_bound_in_enclosing_scopes):
     assert isinstance(block, forward_analysis.Block)
-    bound_names = names_bound_in_enclosing_scopes | scope_analysis.find_bound_names(block)
+    bound_names = names_bound_in_enclosing_scopes | block.find_bound_names()
     if block.intro is None:
         extended_suite = block.suite
     else:
